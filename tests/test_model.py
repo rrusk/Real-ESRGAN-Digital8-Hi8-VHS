@@ -1,12 +1,19 @@
 import torch
 import yaml
+import pytest
 from basicsr.archs.rrdbnet_arch import RRDBNet
 from basicsr.data.paired_image_dataset import PairedImageDataset
-from basicsr.losses.losses import GANLoss, L1Loss, PerceptualLoss
+from basicsr.losses.basic_loss import L1Loss, PerceptualLoss
+from basicsr.losses.gan_loss import GANLoss
 
 from realesrgan.archs.discriminator_arch import UNetDiscriminatorSN
 from realesrgan.models.realesrgan_model import RealESRGANModel
 from realesrgan.models.realesrnet_model import RealESRNetModel
+
+
+# BasicSR's training models allocate CUDA tensors internally, independent of
+# the model-device option. Their training-path checks require an actual GPU.
+pytestmark = pytest.mark.skipif(not torch.cuda.is_available(), reason='upstream training models require CUDA')
 
 
 def test_realesrnet_model():

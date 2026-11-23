@@ -1,9 +1,24 @@
-basicsr>=1.4.2
+# Recommended RTX 4060 Ti production environment.
+# CUDA wheels come from this index; ordinary packages still come from PyPI.
+# Follow INSTALL.md to build BasicSR against the installed stack.
+--extra-index-url https://download.pytorch.org/whl/cu128
+
+# Core constraints for BasicSR compatibility
+numpy==1.25.0
+basicsr==1.4.2
+# Keep BasicSR on the supported SciPy API generation. patch_basicsr.py also
+# rewrites its deprecated ndimage import to the public namespace.
+scipy<2
 facexlib>=0.2.5
 gfpgan>=1.3.5
-numpy
-opencv-python
+
+# Media Processing
+opencv-python<4.10
+ffmpeg-python
 Pillow
-torch>=1.7
-torchvision
 tqdm
+
+# Deep learning: current validated CUDA 12.8 stack
+torch==2.11.0
+torchvision==0.26.0
+torchaudio==2.11.0

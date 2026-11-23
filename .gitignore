@@ -138,3 +138,17 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# --- AI pipeline additions ---
+**/wip/
+processing_chunks*
+rife-ncnn-vulkan
+rife-ncnn-vulkan-20221029-ubuntu/
+rife-ncnn-vulkan-20221029-ubuntu.zip
+processing_chunks/
+*_wrapper.*
+outputs/
+*.avi
+*.mpg
+*.mp4
+*.mp3

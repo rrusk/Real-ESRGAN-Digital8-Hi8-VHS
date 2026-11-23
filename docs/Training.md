@@ -1,3 +1,6 @@
+> Retained upstream training guide. For this fork's inference environment,
+> follow [INSTALL.md](../INSTALL.md).
+
 # :computer: How to Train/Finetune Real-ESRGAN
 
 - [Train Real-ESRGAN](#train-real-esrgan)
@@ -34,7 +37,7 @@ Here are steps for data preparation.
 #### Step 1: [Optional] Generate multi-scale images
 
 For the DF2K dataset, we use a multi-scale strategy, *i.e.*, we downsample HR images to obtain several Ground-Truth images with different scales. <br>
-You can use the [scripts/generate_multiscale_DF2K.py](scripts/generate_multiscale_DF2K.py) script to generate multi-scale images. <br>
+You can use the [scripts/generate_multiscale_DF2K.py](../scripts/generate_multiscale_DF2K.py) script to generate multi-scale images. <br>
 Note that this step can be omitted if you just want to have a fast try.
 
 ```bash
@@ -46,7 +49,7 @@ python scripts/generate_multiscale_DF2K.py --input datasets/DF2K/DF2K_HR --outpu
 We then crop DF2K images into sub-images for faster IO and processing.<br>
 This step is optional if your IO is enough or your disk space is limited.
 
-You can use the [scripts/extract_subimages.py](scripts/extract_subimages.py) script. Here is the example:
+You can use the [scripts/extract_subimages.py](../scripts/extract_subimages.py) script. Here is the example:
 
 ```bash
  python scripts/extract_subimages.py --input datasets/DF2K/DF2K_multiscale --output datasets/DF2K/DF2K_multiscale_sub --crop_size 400 --step 200
@@ -63,7 +66,7 @@ DF2K_HR_sub/000001_s003.png
 ...
 ```
 
-You can use the [scripts/generate_meta_info.py](scripts/generate_meta_info.py) script to generate the txt file. <br>
+You can use the [scripts/generate_meta_info.py](../scripts/generate_meta_info.py) script to generate the txt file. <br>
 You can merge several folders into one meta_info txt. Here is the example:
 
 ```bash
@@ -188,7 +191,7 @@ Download pre-trained models into `experiments/pretrained_models`.
 
 **3. Finetune**
 
-Modify [options/finetune_realesrgan_x4plus.yml](options/finetune_realesrgan_x4plus.yml) accordingly, especially the `datasets` part:
+Modify [options/finetune_realesrgan_x4plus.yml](../options/finetune_realesrgan_x4plus.yml) accordingly, especially the `datasets` part:
 
 ```yml
 train:
@@ -223,7 +226,7 @@ Assume that you already have two folders:
 - **gt folder** (Ground-truth, high-resolution images): *datasets/DF2K/DIV2K_train_HR_sub*
 - **lq folder** (Low quality, low-resolution images): *datasets/DF2K/DIV2K_train_LR_bicubic_X4_sub*
 
-Then, you can prepare the meta_info txt file using the script [scripts/generate_meta_info_pairdata.py](scripts/generate_meta_info_pairdata.py):
+Then, you can prepare the meta_info txt file using the script [scripts/generate_meta_info_pairdata.py](../scripts/generate_meta_info_pairdata.py):
 
 ```bash
 python scripts/generate_meta_info_pairdata.py --input datasets/DF2K/DIV2K_train_HR_sub datasets/DF2K/DIV2K_train_LR_bicubic_X4_sub --meta_info datasets/DF2K/meta_info/meta_info_DIV2K_sub_pair.txt
@@ -245,7 +248,7 @@ Download pre-trained models into `experiments/pretrained_models`.
 
 **3. Finetune**
 
-Modify [options/finetune_realesrgan_x4plus_pairdata.yml](options/finetune_realesrgan_x4plus_pairdata.yml) accordingly, especially the `datasets` part:
+Modify [options/finetune_realesrgan_x4plus_pairdata.yml](../options/finetune_realesrgan_x4plus_pairdata.yml) accordingly, especially the `datasets` part:
 
 ```yml
 train:

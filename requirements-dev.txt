@@ -1,0 +1,4 @@
+# Development checks; install the runtime environment separately (INSTALL.md).
+flake8==6.1.0
+pytest>=8,<10
+pre-commit>=3,<5

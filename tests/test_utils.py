@@ -1,15 +1,22 @@
+from pathlib import Path
+
 import numpy as np
+import torch
 from basicsr.archs.rrdbnet_arch import RRDBNet
 
 from realesrgan.utils import RealESRGANer
 
 
-def test_realesrganer():
-    # initialize with default model
+def test_realesrganer(tmp_path):
+    # initialize with the standard RealESRGAN_x4plus model
+    default_model_path = Path(__file__).resolve().parents[1] / 'weights' / 'RealESRGAN_x4plus.pth'
+    default_model = RRDBNet(
+        num_in_ch=3, num_out_ch=3, num_feat=64, num_block=23,
+        num_grow_ch=32, scale=4)
     restorer = RealESRGANer(
         scale=4,
-        model_path='experiments/pretrained_models/RealESRGAN_x4plus.pth',
-        model=None,
+        model_path=str(default_model_path),
+        model=default_model,
         tile=10,
         tile_pad=10,
         pre_pad=2,
@@ -18,9 +25,11 @@ def test_realesrganer():
     assert restorer.half is False
     # initialize with user-defined model
     model = RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64, num_block=6, num_grow_ch=32, scale=4)
+    custom_model_path = tmp_path / 'custom_model.pth'
+    torch.save({'params_ema': model.state_dict()}, custom_model_path)
     restorer = RealESRGANer(
         scale=4,
-        model_path='experiments/pretrained_models/RealESRGAN_x4plus_anime_6B.pth',
+        model_path=str(custom_model_path),
         model=model,
         tile=10,
         tile_pad=10,

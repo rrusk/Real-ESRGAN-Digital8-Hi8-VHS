@@ -1,3 +1,6 @@
+> Retained upstream training guide. For this fork's inference environment,
+> follow [INSTALL.md](../INSTALL.md).
+
 # :computer: 如何训练/微调 Real-ESRGAN
 
 - [训练 Real-ESRGAN](#训练-real-esrgan)
@@ -34,7 +37,7 @@
 #### 第1步：【可选】生成多尺寸图片
 
 针对 DF2K 数据集，我们使用多尺寸缩放策略，*换言之*，我们对 HR 图像进行下采样，就能获得多尺寸的标准参考（Ground-Truth）图像。 <br>
-您可以使用这个 [scripts/generate_multiscale_DF2K.py](scripts/generate_multiscale_DF2K.py) 脚本快速生成多尺寸的图像。<br>
+您可以使用这个 [scripts/generate_multiscale_DF2K.py](../scripts/generate_multiscale_DF2K.py) 脚本快速生成多尺寸的图像。<br>
 注意：如果您只想简单试试，那么可以跳过此步骤。
 
 ```bash
@@ -46,7 +49,7 @@ python scripts/generate_multiscale_DF2K.py --input datasets/DF2K/DF2K_HR --outpu
 我们可以将 DF2K 图像裁切为子图像，以加快 IO 和处理速度。<br>
 如果你的 IO 够好或储存空间有限，那么此步骤是可选的。<br>
 
-您可以使用脚本 [scripts/extract_subimages.py](scripts/extract_subimages.py)。这是使用示例:
+您可以使用脚本 [scripts/extract_subimages.py](../scripts/extract_subimages.py)。这是使用示例:
 
 ```bash
  python scripts/extract_subimages.py --input datasets/DF2K/DF2K_multiscale --output datasets/DF2K/DF2K_multiscale_sub --crop_size 400 --step 200
@@ -63,7 +66,7 @@ DF2K_HR_sub/000001_s003.png
 ...
 ```
 
-你可以使用该脚本 [scripts/generate_meta_info.py](scripts/generate_meta_info.py) 生成包含图像路径的 txt 文件。<br>
+你可以使用该脚本 [scripts/generate_meta_info.py](../scripts/generate_meta_info.py) 生成包含图像路径的 txt 文件。<br>
 你还可以合并多个文件夹的图像路径到一个元信息（meta_info）txt。这是使用示例:
 
 ```bash
@@ -188,7 +191,7 @@ DF2K_HR_sub/000001_s003.png
 
 **3. 微调**
 
-修改选项文件 [options/finetune_realesrgan_x4plus.yml](options/finetune_realesrgan_x4plus.yml) ，特别是 `datasets` 部分：
+修改选项文件 [options/finetune_realesrgan_x4plus.yml](../options/finetune_realesrgan_x4plus.yml) ，特别是 `datasets` 部分：
 
 ```yml
 train:
@@ -223,7 +226,7 @@ python realesrgan/train.py -opt options/finetune_realesrgan_x4plus.yml --auto_re
 - **gt folder**（标准参考，高分辨率图像）：*datasets/DF2K/DIV2K_train_HR_sub*
 - **lq folder**（低质量，低分辨率图像）：*datasets/DF2K/DIV2K_train_LR_bicubic_X4_sub*
 
-然后，您可以使用脚本 [scripts/generate_meta_info_pairdata.py](scripts/generate_meta_info_pairdata.py) 生成元信息（meta_info）txt 文件。
+然后，您可以使用脚本 [scripts/generate_meta_info_pairdata.py](../scripts/generate_meta_info_pairdata.py) 生成元信息（meta_info）txt 文件。
 
 ```bash
 python scripts/generate_meta_info_pairdata.py --input datasets/DF2K/DIV2K_train_HR_sub datasets/DF2K/DIV2K_train_LR_bicubic_X4_sub --meta_info datasets/DF2K/meta_info/meta_info_DIV2K_sub_pair.txt
@@ -245,7 +248,7 @@ python scripts/generate_meta_info_pairdata.py --input datasets/DF2K/DIV2K_train_
 
 **3. 微调**
 
-修改选项文件 [options/finetune_realesrgan_x4plus_pairdata.yml](options/finetune_realesrgan_x4plus_pairdata.yml) ，特别是 `datasets` 部分：
+修改选项文件 [options/finetune_realesrgan_x4plus_pairdata.yml](../options/finetune_realesrgan_x4plus_pairdata.yml) ，特别是 `datasets` 部分：
 
 ```yml
 train:

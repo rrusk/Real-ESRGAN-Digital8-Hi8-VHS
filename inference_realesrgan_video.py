@@ -6,6 +6,7 @@ import numpy as np
 import os
 import shutil
 import subprocess
+import sys
 import torch
 from basicsr.archs.rrdbnet_arch import RRDBNet
 from basicsr.utils.download_util import load_file_from_url
@@ -39,6 +40,17 @@ def get_video_meta_info(video_path):
 def get_sub_video(args, num_process, process_idx):
     if num_process == 1:
         return args.input
+    # Multiple video workers require a sub-video split. The split command lacks
+    # explicit quality and chroma settings, so refuse it before it can degrade
+    # model input. Frame-folder workers do not need this split.
+    if num_process > 1:
+        raise RuntimeError(
+            f'get_sub_video: num_process={num_process} requires splitting '
+            f'the input into sub-videos, but the ffmpeg command used to do '
+            f'so does not specify -c:v/-crf/-pix_fmt and will silently '
+            f're-encode at lossy defaults (crf=23, yuv420p), degrading the '
+            f'source before upscaling. This path is disabled until that '
+            f'command is updated to match the pipeline\'s quality standard.')
     meta = get_video_meta_info(args.input)
     duration = int(meta['nb_frames'] / meta['fps'])
     part_time = duration // num_process
@@ -148,8 +160,32 @@ class Writer:
                              framerate=fps).output(
                                  audio,
                                  video_save_path,
-                                 pix_fmt='yuv420p',
+                                 pix_fmt=args.out_pix_fmt,
+                                 # yuv444p, not the yuv420p default. This writer's input
+                                 # (bgr24 from the model) is full chroma resolution -- encoding to
+                                 # yuv420p here would halve chroma regardless of CRF, undoing the
+                                 # yuv444p preservation prepare_video.sh's master and the pre-filter
+                                 # step were both deliberately built around. A correct CRF on
+                                 # already-subsampled chroma is still a loss the CRF number can't
+                                 # reveal (the same failure mode confirmed separately for RIFE
+                                 # re-encoding an already-CRF-23 source: a downstream setting cannot
+                                 # recover upstream loss).
+                                 # out_pix_fmt is caller-supplied (--out_pix_fmt) so a deliverable
+                                 # can opt into yuv420p -- required for broad player compatibility
+                                 # -- without making that subsampling silent and always-on.
+                                 # Default remains yuv444p.
                                  vcodec='libx264',
+                                 preset=args.preset,
+                                 # Pin quality explicitly. RIFE intermediates use CRF 16;
+                                 # deliverable callers pass their requested CRF.
+                                 crf=args.crf,
+                                 # Explicit colorimetry so the bgr24->yuv444p conversion
+                                 # uses the correct RGB->YCbCr matrix rather than guessing from SD
+                                 # resolution heuristics. Must stay in sync with COLOR_SPACE /
+                                 # COLOR_PRIMARIES / COLOR_TRC in video_upscale_pipeline.py.
+                                 colorspace='smpte170m',
+                                 color_primaries='smpte170m',
+                                 color_trc='smpte170m',
                                  loglevel='error',
                                  acodec='copy').overwrite_output().run_async(
                                      pipe_stdin=True, pipe_stdout=True, cmd=args.ffmpeg_bin))
@@ -157,17 +193,52 @@ class Writer:
             self.stream_writer = (
                 ffmpeg.input('pipe:', format='rawvideo', pix_fmt='bgr24', s=f'{out_width}x{out_height}',
                              framerate=fps).output(
-                                 video_save_path, pix_fmt='yuv420p', vcodec='libx264',
+                                 video_save_path, pix_fmt=args.out_pix_fmt,  # see rationale above
+                                 vcodec='libx264',
+                                 preset=args.preset,
+                                 crf=args.crf,  # see rationale above
+                                 colorspace='smpte170m',      # see colorimetry rationale above
+                                 color_primaries='smpte170m',
+                                 color_trc='smpte170m',
+                                 loglevel='error').overwrite_output().run_async(
+                                     pipe_stdin=True, pipe_stdout=True, cmd=args.ffmpeg_bin))
+
+        # Optional diagnostic master. Both writers receive the very same BGR
+        # model-output bytes in write_frame(), allowing the lossy CRF writer to
+        # be evaluated without a second, potentially non-identical GPU run.
+        self.lossless_writer = None
+        if args.lossless_output:
+            self.lossless_writer = (
+                ffmpeg.input('pipe:', format='rawvideo', pix_fmt='bgr24', s=f'{out_width}x{out_height}',
+                             framerate=fps).output(
+                                 args.lossless_output,
+                                 vcodec='ffv1', level=3, coder=1, context=1,
+                                 pix_fmt='bgr0',
                                  loglevel='error').overwrite_output().run_async(
                                      pipe_stdin=True, pipe_stdout=True, cmd=args.ffmpeg_bin))
 
     def write_frame(self, frame):
         frame = frame.astype(np.uint8).tobytes()
         self.stream_writer.stdin.write(frame)
+        if self.lossless_writer is not None:
+            self.lossless_writer.stdin.write(frame)
 
     def close(self):
-        self.stream_writer.stdin.close()
-        self.stream_writer.wait()
+        # A writer can still fail after its last frame, writing the trailer or
+        # on a full disk, so each must exit cleanly. Both are closed before
+        # either failure is raised.
+        failures = []
+        for name, writer in (('video', self.stream_writer), ('lossless diagnostic', self.lossless_writer)):
+            if writer is None:
+                continue
+            try:
+                writer.stdin.close()
+            except BrokenPipeError:
+                pass  # ffmpeg already exited; its status below says how
+            if writer.wait() != 0:
+                failures.append(f'{name} writer (ffmpeg) exited with status {writer.returncode}')
+        if failures:
+            raise RuntimeError('; '.join(failures))
 
 
 def inference_video(args, video_save_path, device=None, total_workers=1, worker_idx=0):
@@ -288,6 +359,16 @@ def run(args):
 
     num_gpus = torch.cuda.device_count()
     num_process = num_gpus * args.num_process_per_gpu
+    input_type = mimetypes.guess_type(args.input)[0]
+    if num_process > 1 and input_type is not None and input_type.startswith('video'):
+        # More than one worker needs the input split into sub-videos, and
+        # get_sub_video refuses to do that (its ffmpeg split re-encodes at
+        # lossy defaults). A video therefore runs as one process on one GPU
+        # whatever the GPU count; a frame folder (--extract_frame_first) is
+        # divided by frame and still uses every worker.
+        print(f'{num_process} workers would need a lossy sub-video split; '
+              f'running the video in a single process instead')
+        num_process = 1
     if num_process == 1:
         inference_video(args, video_save_path)
         return
@@ -296,14 +377,19 @@ def run(args):
     pool = ctx.Pool(num_process)
     os.makedirs(osp.join(args.output, f'{args.video_name}_out_tmp_videos'), exist_ok=True)
     pbar = tqdm(total=num_process, unit='sub_video', desc='inference')
+    workers = []
     for i in range(num_process):
         sub_video_save_path = osp.join(args.output, f'{args.video_name}_out_tmp_videos', f'{i:03d}.mp4')
-        pool.apply_async(
+        workers.append(pool.apply_async(
             inference_video,
             args=(args, sub_video_save_path, torch.device(i % num_gpus), num_process, i),
-            callback=lambda arg: pbar.update(1))
+            callback=lambda arg: pbar.update(1)))
     pool.close()
     pool.join()
+    # apply_async keeps a worker's exception until get(); without this the
+    # concat below runs over missing sub-videos and the script exits 0.
+    for worker in workers:
+        worker.get()
 
     # combine sub videos
     # prepare vidlist.txt
@@ -316,7 +402,7 @@ def run(args):
         'copy', f'{video_save_path}'
     ]
     print(' '.join(cmd))
-    subprocess.call(cmd)
+    subprocess.run(cmd, check=True)
     shutil.rmtree(osp.join(args.output, f'{args.video_name}_out_tmp_videos'))
     if osp.exists(osp.join(args.output, f'{args.video_name}_inp_tmp_videos')):
         shutil.rmtree(osp.join(args.output, f'{args.video_name}_inp_tmp_videos'))
@@ -328,6 +414,10 @@ def main():
     It mainly for restoring anime videos.
 
     """
+    # Line-buffered even into a pipe, so a run watched through `| tee` shows
+    # its lines as they happen and before the output of commands it starts.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(line_buffering=True)
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type=str, default='inputs', help='Input video, image or folder')
     parser.add_argument(
@@ -355,7 +445,35 @@ def main():
     parser.add_argument(
         '--fp32', action='store_true', help='Use fp32 precision during inference. Default: fp16 (half precision).')
     parser.add_argument('--fps', type=float, default=None, help='FPS of the output video')
+    parser.add_argument(
+        '--crf',
+        type=int,
+        default=16,
+        help=('CRF for the Writer\'s final libx264 encode. Default: 16 (archival/near-transparent '
+              'master). Callers producing a distribution-ready deliverable should pass a higher '
+              '(more compressed) value, e.g. 18.'))
+    parser.add_argument(
+        '--out_pix_fmt',
+        type=str,
+        default='yuv444p',
+        choices=['yuv444p', 'yuv420p'],
+        help=('pix_fmt for the Writer\'s final encode. Default: yuv444p (full chroma, matches the '
+              'pre-filter master -- no second chroma-subsampling step before a player ever sees it). '
+              'Use yuv420p for a distribution-ready deliverable: required for broad player '
+              'compatibility, since many hardware decoders and TVs do not support yuv444p.'))
     parser.add_argument('--ffmpeg_bin', type=str, default='ffmpeg', help='The path to ffmpeg')
+    parser.add_argument(
+        '--preset',
+        type=str,
+        default='medium',
+        help=('libx264 preset for the normal video writer. Default: medium, explicitly pinning '
+              'the historical x264 default used by the production pipeline.'))
+    parser.add_argument(
+        '--lossless_output',
+        type=str,
+        default=None,
+        help=('Optional FFV1/BGR0 diagnostic output. It is written from the exact same model frames '
+              'as the normal H.264 output so writer loss can be isolated without a second GPU pass.'))
     parser.add_argument('--extract_frame_first', action='store_true')
     parser.add_argument('--num_process_per_gpu', type=int, default=1)
 

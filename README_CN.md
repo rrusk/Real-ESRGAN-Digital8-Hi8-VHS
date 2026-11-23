@@ -1,8 +1,11 @@
+> 本文保留上游 Real-ESRGAN 文档；本分支的安装和磁带修复流程见
+> [README.md](README.md) 和 [INSTALL.md](INSTALL.md)。
+
 <p align="center">
   <img src="assets/realesrgan_logo.png" height=120>
 </p>
 
-## <div align="center"><b><a href="README.md">English</a> | <a href="README_CN.md">简体中文</a></b></div>
+## <div align="center"><b><a href="README_Original.md">English</a> | <a href="README_CN.md">简体中文</a></b></div>
 
 [![download](https://img.shields.io/github/downloads/xinntao/Real-ESRGAN/total.svg)](https://github.com/xinntao/Real-ESRGAN/releases)
 [![PyPI](https://img.shields.io/pypi/v/realesrgan)](https://pypi.org/project/realesrgan/)

@@ -73,9 +73,15 @@ def get_version():
 
 
 def get_requirements(filename='requirements.txt'):
+    """Read dependency specifiers, excluding comments and pip-only directives."""
     here = os.path.dirname(os.path.realpath(__file__))
+    requires = []
     with open(os.path.join(here, filename), 'r') as f:
-        requires = [line.replace('\n', '') for line in f.readlines()]
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#') or line.startswith('-'):
+                continue
+            requires.append(line)
     return requires
 
 
@@ -84,24 +90,29 @@ if __name__ == '__main__':
     setup(
         name='realesrgan',
         version=get_version(),
-        description='Real-ESRGAN aims at developing Practical Algorithms for General Image Restoration',
+        description='Real-ESRGAN restoration pipeline for Digital8, Hi8 and VHS captures',
         long_description=readme(),
         long_description_content_type='text/markdown',
         author='Xintao Wang',
         author_email='xintao.wang@outlook.com',
         keywords='computer vision, pytorch, image restoration, super-resolution, esrgan, real-esrgan',
-        url='https://github.com/xinntao/Real-ESRGAN',
+        url='https://github.com/rrusk/Real-ESRGAN-Digital8-Hi8-VHS',
+        project_urls={
+            'Issues': 'https://github.com/rrusk/Real-ESRGAN-Digital8-Hi8-VHS/issues',
+            'Upstream': 'https://github.com/xinntao/Real-ESRGAN',
+        },
         include_package_data=True,
         packages=find_packages(exclude=('options', 'datasets', 'experiments', 'results', 'tb_logger', 'wandb')),
         classifiers=[
             'Development Status :: 4 - Beta',
-            'License :: OSI Approved :: Apache Software License',
-            'Operating System :: OS Independent',
+            'License :: OSI Approved :: BSD License',
+            'Operating System :: POSIX :: Linux',
             'Programming Language :: Python :: 3',
-            'Programming Language :: Python :: 3.7',
-            'Programming Language :: Python :: 3.8',
+            'Programming Language :: Python :: 3.10',
+            'Programming Language :: Python :: 3.11',
         ],
         license='BSD-3-Clause License',
-        setup_requires=['cython', 'numpy'],
+        # NumPy 1.25 supports up to 3.11; the pipeline requires 3.10 syntax.
+        python_requires='>=3.10,<3.12',
         install_requires=get_requirements(),
         zip_safe=False)

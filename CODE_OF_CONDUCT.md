@@ -59,9 +59,11 @@ representative at an online or offline event.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the community leaders responsible for enforcement at
-xintao.wang@outlook.com or xintaowang@tencent.com.
-All complaints will be reviewed and investigated promptly and fairly.
+reported privately to [this fork's maintainer](https://github.com/rrusk).
+To arrange a private reporting channel, open an
+[issue in this fork](https://github.com/rrusk/Real-ESRGAN-Digital8-Hi8-VHS/issues)
+requesting contact, without including incident details or personal information.
+The fork maintainer is responsible for reviewing and investigating reports.
 
 All community leaders are obligated to respect the privacy and security of the
 reporter of any incident.
